@@ -1,0 +1,24 @@
+[package]
+description = "Attribute macro behind the `twinned` crate. Use `twinned` instead."
+edition.workspace = true
+license.workspace = true
+name = "twinned-macros"
+repository.workspace = true
+version.workspace = true
+
+[lib]
+proc-macro = true
+
+[features]
+default = []
+salvo = []
+
+[dependencies]
+quote.workspace = true
+syn.workspace = true
+
+[dev-dependencies]
+salvo.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+surrealdb-types.workspace = true
