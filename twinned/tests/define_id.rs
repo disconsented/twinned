@@ -1,5 +1,4 @@
 use surrealdb_types::SurrealValue;
-
 use twinned::define_id;
 
 define_id!("apps", IAppID, AppID, i64);

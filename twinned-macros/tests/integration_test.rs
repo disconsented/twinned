@@ -1,7 +1,7 @@
-use twinned_macros::dual_struct;
 use salvo::{oapi::__private::serde_json, prelude::ToSchema};
 use serde::{Deserialize, Serialize};
 use surrealdb_types::SurrealValue;
+use twinned_macros::dual_struct;
 
 // Mock types to simulate the User's environment
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, SurrealValue, ToSchema)]
