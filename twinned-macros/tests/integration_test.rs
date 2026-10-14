@@ -1,6 +1,6 @@
 use salvo::{oapi::__private::serde_json, prelude::ToSchema};
 use serde::{Deserialize, Serialize};
-use surrealdb_types::SurrealValue;
+use surrealdb_types::{RecordId, RecordIdKey, SurrealValue};
 use twinned_macros::dual_struct;
 
 // Mock types to simulate the User's environment
@@ -26,30 +26,36 @@ impl From<i64> for AppID {
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, SurrealValue)]
 #[surreal(crate = "surrealdb_types")]
-pub struct IItemID(surrealdb_types::RecordId);
+pub struct IItemID(RecordId);
 impl From<ItemID> for IItemID {
     fn from(id: ItemID) -> Self {
-        Self(surrealdb_types::RecordId::new("workshop_items", id.0))
+        Self(RecordId::new("workshop_items", id.0))
     }
 }
 impl From<IItemID> for ItemID {
-    fn from(_id: IItemID) -> Self {
-        // Simple mock conversion for testing
-        Self(0)
+    fn from(id: IItemID) -> Self {
+        Self(number_key(&id.0))
     }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug, PartialEq, SurrealValue)]
 #[surreal(crate = "surrealdb_types")]
-pub struct IAppID(surrealdb_types::RecordId);
+pub struct IAppID(RecordId);
 impl From<AppID> for IAppID {
     fn from(id: AppID) -> Self {
-        Self(surrealdb_types::RecordId::new("apps", id.0))
+        Self(RecordId::new("apps", id.0))
     }
 }
 impl From<IAppID> for AppID {
-    fn from(_id: IAppID) -> Self {
-        Self(0)
+    fn from(id: IAppID) -> Self {
+        Self(number_key(&id.0))
+    }
+}
+
+fn number_key(id: &RecordId) -> i64 {
+    match id.key {
+        RecordIdKey::Number(key) => key,
+        ref key => panic!("expected a number key, got {key:?}"),
     }
 }
 
@@ -90,8 +96,8 @@ fn test_surreal_attr() {
     // attribute We can also check if the attribute is present via some
     // reflection or just trust compilation for now
     let _item = InternalExampleItem {
-        id: IItemID(surrealdb_types::RecordId::new("workshop_items", 1)),
-        appid: IAppID(surrealdb_types::RecordId::new("apps", 1)),
+        id: IItemID(RecordId::new("workshop_items", 1)),
+        appid: IAppID(RecordId::new("apps", 1)),
         related_items: vec![],
         title: "title".to_string(),
         description: "desc".to_string(),
@@ -112,47 +118,40 @@ fn test_dual_struct_generation() {
         wrapped_items: vec![],
     };
 
-    let internal: InternalExampleItem = external.clone().try_into().unwrap();
-    let internal_id: IItemID = internal.id.clone();
-    let internal_appid: IAppID = internal.appid.clone();
+    let internal = InternalExampleItem::from(external.clone());
+    assert_eq!(internal.id, IItemID::from(ItemID(123)));
+    assert_eq!(internal.appid, IAppID::from(AppID(456)));
     assert_eq!(internal.related_items.len(), 2);
-    let _ = internal.preview_url.clone();
-
-    // Check fields
-    // internal.id is IItemID
-    // internal.appid is IAppID
+    assert_eq!(internal.preview_url, None);
     assert_eq!(internal.title, "Test Title");
 
     let external_back: ExternalExampleItem = internal.try_into().expect("Conversion failed");
+    assert_eq!(external_back.id, ItemID(123));
+    assert_eq!(external_back.appid, AppID(456));
+    assert_eq!(external_back.related_items, vec![ItemID(789), ItemID(101)]);
     assert_eq!(external_back.title, "Test Title");
-    assert_eq!(external_back.related_items.len(), 2);
-    // Conversion back for IDs depends on From impls above
 }
 
 #[test]
-fn test_serde_rename() {
+fn test_serde_round_trip() {
     let external = ExternalExampleItem {
         id: ItemID(123),
         appid: AppID(456),
-        related_items: vec![],
+        related_items: vec![ItemID(789)],
         title: "Test Title".to_string(),
         description: "Test Description".to_string(),
         preview_url: None,
         wrapped_items: vec![],
     };
 
-    let json = serde_json::to_string(&external).unwrap();
-    // Should be renamed to "ExampleItem" in JSON if used in a map or similar,
-    // but #[serde(rename = "ExampleItem")] on a struct itself usually affects
-    // how it's named when it's a field in another struct or when using
-    // certain formats. Actually, for a top-level struct, it doesn't change
-    // the JSON unless it's in a container.
+    // serde_json does not write a struct name, so the `#[serde(rename)]` that
+    // the macro adds cannot show here. This test checks the field shape only.
+    let json = serde_json::to_value(&external).unwrap();
+    assert_eq!(json["id"], 123);
+    assert_eq!(json["appid"], 456);
+    assert_eq!(json["related_items"], serde_json::json!([789]));
 
-    #[derive(Serialize)]
-    struct Container {
-        item: ExternalExampleItem,
-    }
-    let container = Container { item: external };
-    let json = serde_json::to_string(&container).unwrap();
-    // This doesn't actually test the rename because "item" is the field name.
+    let back: ExternalExampleItem = serde_json::from_value(json).unwrap();
+    assert_eq!(back.id, ItemID(123));
+    assert_eq!(back.title, "Test Title");
 }
