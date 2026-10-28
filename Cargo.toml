@@ -6,10 +6,10 @@ resolver = "3"
 edition = "2024"
 license = "MPL-2.0"
 repository = "https://github.com/disconsented/twinned"
-version = "0.1.0"
+version = "0.2.0"
 
 [workspace.dependencies]
-twinned-macros = { path = "./twinned-macros", version = "0.1.0" }
+twinned-macros = { path = "./twinned-macros", version = "0.2.0" }
 
 quote = "1.0"
 salvo = { features = ["oapi"], version = "0.96" }

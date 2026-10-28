@@ -51,6 +51,24 @@ pub use twinned_macros::dual_struct;
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __twinned_external_id {
+    ($external:ident, $external_type:ty,with = $with:literal,schema = $schema:ty) => {
+        /// Externally facing newtype over the ID's plain key type.
+        #[derive(
+            serde::Serialize,
+            serde::Deserialize,
+            Clone,
+            Debug,
+            Eq,
+            PartialEq,
+            Ord,
+            PartialOrd,
+            Hash,
+            salvo::prelude::ToSchema,
+        )]
+        #[salvo(schema(value_type = $schema))]
+        #[serde(transparent)]
+        pub struct $external(#[serde(with = $with)] $external_type);
+    };
     ($external:ident, $external_type:ty) => {
         /// Externally facing newtype over the ID's plain key type.
         #[derive(
@@ -75,6 +93,9 @@ macro_rules! __twinned_external_id {
 #[doc(hidden)]
 #[macro_export]
 macro_rules! __twinned_external_id {
+    ($external:ident, $external_type:ty, with = $with:literal, schema = $schema:ty) => {
+        compile_error!("enable the salvo feature to use with & schema")
+    };
     ($external:ident, $external_type:ty) => {
         /// Externally facing newtype over the ID's plain key type.
         #[derive(
@@ -92,23 +113,10 @@ macro_rules! __twinned_external_id {
         pub struct $external($external_type);
     };
 }
-
-/// A helper macro to define a newtype for a SurrealDB record ID.
-/// Makes it not a total pain in the ass to deal with.
-///
-/// Implemented with 2 structs because, we can't maintain a transparent newtype
-/// with an enum, which, makes sense as its a different type.
-///
-/// ## Args:
-/// Table name: The name of the SurrealDB table\
-/// Internal name: The name of the internal newtype (interfaces with the DB)\
-/// External name: The name of the external newtype (exposed to users)\
-/// External type: The underlying type of the external newtype
+#[doc(hidden)]
 #[macro_export]
-macro_rules! define_id {
+macro_rules! __twinned_id_body {
     ($table:literal, $internal:ident, $external:ident, $external_type:ty) => {
-        $crate::__twinned_external_id!($external, $external_type);
-
         impl From<$external> for $external_type {
             fn from(id: $external) -> $external_type {
                 id.0
@@ -183,5 +191,35 @@ macro_rules! define_id {
                 &self.0
             }
         }
+    };
+}
+
+/// A helper macro to define a newtype for a SurrealDB record ID.
+/// Makes it not a total pain in the ass to deal with.
+///
+/// Implemented with 2 structs because, we can't maintain a transparent newtype
+/// with an enum, which, makes sense as its a different type.
+///
+/// ## Args:
+/// Table name: The name of the SurrealDB table\
+/// Internal name: The name of the internal newtype (interfaces with the DB)\
+/// External name: The name of the external newtype (exposed to users)\
+/// External type: The underlying type of the external newtype
+#[macro_export]
+macro_rules! define_id {
+    (
+        $table:literal,
+        $internal:ident,
+        $external:ident,
+        $external_type:ty,with =
+        $with:literal,schema =
+        $schema:ty
+    ) => {
+        $crate::__twinned_external_id!($external, $external_type, with = $with, schema = $schema);
+        $crate::__twinned_id_body!($table, $internal, $external, $external_type);
+    };
+    ($table:literal, $internal:ident, $external:ident, $external_type:ty) => {
+        $crate::__twinned_external_id!($external, $external_type);
+        $crate::__twinned_id_body!($table, $internal, $external, $external_type);
     };
 }
